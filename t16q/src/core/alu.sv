@@ -40,4 +40,17 @@ module ALU (
       LDUI: result = {s2[7:0], s1[7:0]};
       default: result = 0;
     endcase
+
+  function automatic [16:0] shr(input [15:0] s1, input [15:0] s2);
+    var overflow;
+    var [15:0] res;
+    var shift = s2[3:0];
+    if (!s2[15]) begin
+      res = s1 >> shift;
+    end else begin
+      var [3:0] lshift = (~shift + 1);
+      res = s1 << lshift;
+    end
+    shr = {overflow, res};
+  endfunction
 endmodule

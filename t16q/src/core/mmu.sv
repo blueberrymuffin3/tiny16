@@ -1,7 +1,7 @@
 `default_nettype none
 
 module MMU (
-    input clk,
+    input Clock clk,
     input w_en,
     input [15:0] addr,
     input [15:0] data_w,
@@ -20,7 +20,7 @@ module MMU (
   assign data_r   = addr[15] ? data_ram : data_rom;
   //  TODO: Memory Mapped IO
 
-  always_ff @(negedge clk)
+  always_ff @(posedge clk.ph0)
     if (w_en && addr[15]) begin
       ram[addr[14:1]] <= data_w;
       //  TODO: Memory Mapped IO
