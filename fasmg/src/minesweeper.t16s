@@ -1,0 +1,489 @@
+include "lib/tiny16.t16inc"
+include "lib/math.t16inc"
+include "lib/console.t16inc"
+include "lib/printf.t16inc"
+
+FIELD_WIDTH := 11
+FIELD_HEIGHT := 11
+FIELD_SIZE := FIELD_WIDTH * FIELD_HEIGHT
+FIELD_SQUARE_FLAG := 0x1
+FIELD_SQUARE_BOMB := 0x2
+FIELD_SQUARE_HIDE := 0x4
+FIELD_BOMB_COUNT := 10
+
+; Row-major array of words
+global G_FIELD_DATA, FIELD_WIDTH * FIELD_HEIGHT * 2
+; Pair of ints, X,Y
+global G_CURSOR_POS, 4
+
+proc main
+    subi sp, sp, 6
+    str lr, sp, 4
+
+    ; Init cursor to center
+    ldi r1, G_CURSOR_POS
+    ldi r2, FIELD_WIDTH / 2
+    str r2, r1, 0
+    ldi r2, FIELD_HEIGHT / 2
+    str r2, r1, 2
+
+    ; Start with a static seed
+    ; TODO: mix in user input (i.e. delays)
+    ; TODO: mix in initial memory state?
+    ; TODO: we can even delay initial generation until the first user input!
+    ldi r1, 0x6dab
+    ldi r2, 0xf80d
+    call math_rand_seed
+    call generate_field
+    call console_init
+    
+  .reprint:
+    ldi r1, data_str.cursor_hide
+    call printf
+
+    call draw_field
+    call move_cursor
+
+    ldi r1, data_str.cursor_show
+    call printf
+
+  .input_loop:
+    call get_input
+    subr r2, r0, r1
+    ldi r3, 0x41 ; UP
+    cmpr r2, r3
+    beq .handle_UP
+    ldi r3, 0x77 ; UP
+    cmpr r1, r3
+    beq .handle_UP
+    ldi r3, 0x42 ; DOWN
+    cmpr r2, r3
+    beq .handle_DOWN
+    ldi r3, 0x73 ; DOWN
+    cmpr r1, r3
+    beq .handle_DOWN
+    ldi r3, 0x43 ; RIGHT
+    cmpr r2, r3
+    beq .handle_RIGHT
+    ldi r3, 0x64 ; RIGHT
+    cmpr r1, r3
+    beq .handle_RIGHT
+    ldi r3, 0x44 ; LEFT
+    cmpr r2, r3
+    beq .handle_LEFT
+    ldi r3, 0x61 ; LEFT
+    cmpr r1, r3
+    beq .handle_LEFT
+    ldi r3, 0x20 ; space
+    cmpr r1, r3
+    beq .handle_dig
+    ; ldi r3, 0x66 ; f
+    ; cmpr r1, r3
+    ; beq .handle_flag
+    b .input_loop
+
+  .handle_UP:
+    ldi r1, -1
+    b .move_cursor_y
+  .handle_DOWN:
+    ldi r1, 1
+    b .move_cursor_y
+  .handle_RIGHT:
+    ldi r1, 1
+    b .move_cursor_x
+  .handle_LEFT:
+    ldi r1, -1
+    b .move_cursor_x
+
+  .move_cursor_x:
+    ; r1: delta x
+    ldi r3, G_CURSOR_POS
+    ldr r2, r3, 0
+    addr r1, r1, r2
+    blt .input_loop ; negative
+    ldi r2, FIELD_WIDTH
+    cmpr r1, r2
+    bge .input_loop
+    str r1, r3, 0
+    call move_cursor
+    b .input_loop
+
+  .move_cursor_y:
+    ; r1: delta y
+    ldi r3, G_CURSOR_POS
+    ldr r2, r3, 2
+    addr r1, r1, r2
+    blt .input_loop ; negative
+    ldi r2, FIELD_HEIGHT
+    cmpr r1, r2
+    bge .input_loop
+    str r1, r3, 2
+    call move_cursor
+    b .input_loop
+
+  .handle_dig:
+    ldi r8, G_CURSOR_POS
+    ldr r1, r8, 2
+    ldi r2, FIELD_WIDTH
+    call math_mult_word
+    ldr r2, r8, 0
+    addr r1, r1, r2
+    addr r1, r1, r1
+    ldi r2, G_FIELD_DATA
+    addr r1, r1, r2
+
+    ldr r2, r1, 0
+    shri r3, r2, 4
+    testi r3, FIELD_SQUARE_HIDE
+    bne .continue_dig ; Jump range too large for 'beq'
+    b .input_loop
+  .continue_dig:
+    ldi r3, FIELD_SQUARE_HIDE shl 4
+    subr r2, r2, r3
+    str r2, r1, 0
+    b .reprint
+
+  .exit:
+    ldr lr, sp, 4
+    addi sp, sp, 6
+    ret
+end proc
+
+proc generate_field
+  ; Vars:
+  ;   r9: G_FIELD_DATA
+  ;   r10: cell pointer
+    subi sp, sp, 6
+    str lr, sp, 0
+    str r8, sp, 2
+    str r9, sp, 4
+
+    ldi r9, G_FIELD_DATA
+  ; Clear field, mark as hidden
+    mov r1, r9
+    ldi r8, FIELD_SIZE
+    ldi r2, FIELD_SQUARE_HIDE shl 4
+  .clear_loop:
+    str r2, r1, 0
+    addi r1, r1, 2
+    subi r8, r8, 1
+    bne .clear_loop
+
+  ; Place Bombs
+  ; r8: bombs left
+    ldi r8, FIELD_BOMB_COUNT
+  .bomb_loop:
+  ; r1: index
+    ldi r1, FIELD_SIZE
+    call math_rand_int
+
+    ; Check if the cell has a bomb already
+    addr r10, r9, r1
+    addr r10, r10, r1
+    ldr r2, r10, 0
+    shri r4, r2, 4
+    testi r4, FIELD_SQUARE_BOMB
+    bne .bomb_loop
+
+    ; Place the bomb
+    ldi r4, FIELD_SQUARE_BOMB shl 4
+    addr r2, r2, r4
+    str r2, r10, 0
+
+    ; Update neighbors
+  ; r1: row
+  ; r2: col
+  ; r3: rowi
+  ; r4: coli
+    ldi r2, FIELD_WIDTH ; Calculate X and Y
+    call math_divide_word_unsigned
+
+    ldi r3, -1
+  .update_row_loop:
+    ldi r4, -1
+  .update_col_loop:
+  ; r5,r6: neighboring cell absolute
+    addr r5, r3, r1
+    addr r6, r4, r2
+
+    cmpi r5, 0
+    blt .skip_neighbor
+    cmpi r6, 0
+    blt .skip_neighbor
+    ldi r7, FIELD_WIDTH
+    cmpr r6, r7
+    bge .skip_neighbor
+    ldi r7, FIELD_HEIGHT
+    cmpr r5, r7
+    bge .skip_neighbor
+
+  ; r6: neighboring address
+    mov r6, r10
+    addr r6, r6, r4
+    addr r6, r6, r4
+
+    cmpi r3, -1
+    bne .not_up
+    ldi r7, FIELD_WIDTH*2
+    subr r6, r6, r7
+    b .not_down
+  .not_up:
+    cmpi r3, 1
+    bne .not_down
+    ldi r7, FIELD_WIDTH*2
+    addr r6, r6, r7
+  .not_down:
+
+    ldr r5, r6, 0
+    addi r5, r5, 1
+    str r5, r6, 0
+
+  .skip_neighbor:
+    addi r4, r4, 1
+    cmpi r4, 1
+    ble .update_col_loop
+    addi r3, r3, 1
+    cmpi r3, 1
+    ble .update_row_loop
+    subi r8, r8, 1
+    bne .bomb_loop
+
+  .exit:
+    ldr lr, sp, 0
+    ldr r8, sp, 2
+    ldr r9, sp, 4
+    addi sp, sp, 6
+    ret
+end proc
+
+proc draw_field
+  ; Args:
+  ; Vars:
+  ;   r8: field cursor
+  ;   r9: row counter
+  ;   r10: col counter
+  ; Returns:
+    subi sp, sp, 8
+    str lr, sp, 0
+    str r8, sp, 2
+    str r9, sp, 4
+    str r10, sp, 6
+    subi sp, sp, 8
+
+    ldi r8, G_FIELD_DATA
+
+    ldi r1, data_str.color_grass_dark
+    str r1, sp, 0
+    ldi r1, data_str.color_grass_light
+    str r1, sp, 2
+    ldi r1, data_str.color_dirt_dark
+    str r1, sp, 4
+    ldi r1, data_str.color_dirt_light
+    str r1, sp, 6
+
+    ldi r1, data_str.field_prefix
+    call printf
+
+    ldi r9, FIELD_HEIGHT
+  .loop_row:
+    ldi r10, FIELD_WIDTH
+  if FIELD_WIDTH and 1 = 0
+    call .swap_colors
+  end if
+  .loop_col:
+    call .swap_colors
+
+    ; r2: render index
+    ; r3: flags
+    ldr r1, r8, 0
+    addi r8, r8, 2
+    andi r2, r1, 0x0F
+    shri r3, r1, 4
+
+    testi r3, FIELD_SQUARE_BOMB
+    beq .no_bomb
+    ldi r2, 12
+  .no_bomb:
+
+    testi r3, FIELD_SQUARE_HIDE
+    beq .no_hide
+    ldi r2, 10
+  .no_hide:
+
+    testi r3, FIELD_SQUARE_FLAG
+    beq .no_flag
+    ldi r2, 11
+  .no_flag:
+
+    addr r2, r2, r2
+    ldi r1, data_str.field_cell_list
+    addr r1, r1, r2
+    ldr r1, r1, 0
+    call printf
+
+    subi r10, r10, 1
+    bne .loop_col
+
+    ldi r1, data_str.field_newline
+    call printf
+
+    subi r9, r9, 1
+    bne .loop_row
+
+  .exit:
+    addi sp, sp, 8
+    ldr lr, sp, 0
+    ldr r8, sp, 2
+    ldr r9, sp, 4
+    ldr r10, sp, 6
+    addi sp, sp, 8
+    ret
+
+  .swap_colors:
+    ; Swap "a" and "b" colors
+    ldr r1, sp, 0
+    ldr r2, sp, 2
+    str r2, sp, 0
+    str r1, sp, 2
+
+    ldr r1, sp, 4
+    ldr r2, sp, 6
+    str r2, sp, 4
+    str r1, sp, 6
+    ret
+end proc
+
+proc move_cursor
+  ; Vars:
+  ;   r1: x_s
+  ;   r2: y_s
+    subi sp, sp, 6
+    str lr, sp, 4
+
+    ldi r2, G_CURSOR_POS
+    ldr r1, r2, 0
+
+  ; xS = 2x + 3
+    addr r1, r1, r1
+    addi r1, r1, 3
+    str r1, sp, 0
+
+  ; yS = y + 1
+    ldr r1, r2, 2
+    addi r1, r1, 1
+    str r1, sp, 2
+
+    ldi r1, data_str.cursor_move
+    call printf
+
+    ldr lr, sp, 4
+    addi sp, sp, 6
+    ret
+end proc
+
+proc get_input
+  ; Args:
+  ; Vars:
+  ;   r7: console_addr
+  ;   r1: read_char
+  ; Returns:
+  ;   r1: Input Character. Negative if escaped.
+    subi sp, sp, 2
+    str lr, sp, 0
+    ldi r7, console_addr
+  .read_loop:
+    ldr r1, r7, console_offset_io
+    cmpi r1, -1
+    beq .read_loop
+    ldi r2, 0x1B ; 'ESC'
+    cmpr r1, r2
+    bne .exit
+
+    ; ESC char found
+    ldr r1, r7, console_offset_io
+    cmpi r1, -1
+    beq .exit ; We just got ESC, return it
+    ldi r2, 0x5B ; '['
+    cmpr r1, r2
+    bne .clear_invalid_seq ; Invalid ESC SEQ
+    ldr r1, r7, console_offset_io
+    subr r1, r0, r1 ; Return 0-char
+    ldr r0, r7, console_offset_io ; Just check the flags of the char. we read
+    bge .clear_invalid_seq ; We got extra characters, ignore this sequence
+
+    b .exit
+  
+  .clear_invalid_seq: ; We have a complex/unexpected ESC sequence, so we ignore it 
+    ldr r1, r7, console_offset_io
+    cmpi r1, -1
+    bne .clear_invalid_seq
+    b .read_loop
+
+  .exit:
+    ldr lr, sp, 0
+    addi sp, sp, 2
+    ret
+end proc
+
+data_str:
+  .cursor_hide:
+    format_string "\e[?25l"
+  .cursor_show:
+    format_string "\e[?25h"
+  .cursor_move:
+    format_string "\e[%1d;%0dH"
+  .color_grass_dark:
+    format_string "113"
+  .color_grass_light:
+    format_string "149"
+  .color_dirt_dark:
+    format_string "223"
+  .color_dirt_light:
+    format_string "180"
+  .field_prefix:
+    format_string "\e[H " ; Home cursor
+  .field_newline:
+    format_string "\e[38;5;0m▐\e[0m\n "
+
+  align 2
+  .field_cell_list:
+    dw .field_cell_0
+    dw .field_cell_1
+    dw .field_cell_2
+    dw .field_cell_3
+    dw .field_cell_4
+    dw .field_cell_5
+    dw .field_cell_6
+    dw .field_cell_7
+    dw .field_cell_8
+    dw .field_cell_9
+    dw .field_cell_hidden
+    dw .field_cell_flag
+    dw .field_cell_bomb
+  .field_cell_0:
+    format_string "\e[38;5;%3bsm▐", "\e[48;5;%3bsm "
+  .field_cell_1:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;2m\e[48;5;%3bsm1"
+  .field_cell_2:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;4m\e[48;5;%3bsm2"
+  .field_cell_3:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;6m\e[48;5;%3bsm3"
+  .field_cell_4:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;3m\e[48;5;%3bsm4"
+  .field_cell_5:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;5m\e[48;5;%3bsm5"
+  .field_cell_6:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;5m\e[48;5;%3bsm6"
+  .field_cell_7:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;1m\e[48;5;%3bsm7"
+  .field_cell_8:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;1m\e[48;5;%3bsm8"
+  .field_cell_9:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;0m\e[48;5;%3bsm9"
+
+  .field_cell_hidden:
+    format_string "\e[38;5;%0bsm▐", "\e[48;5;%0bsm "
+  .field_cell_flag:
+    format_string "\e[38;5;%0bsm▐", "\e[38;5;1m\e[48;5;%0bsmP"
+  .field_cell_bomb:
+    format_string "\e[38;5;%3bsm▐", "\e[38;5;1m\e[48;5;%3bsmB"

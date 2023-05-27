@@ -1,0 +1,379 @@
+format binary as "t16"
+
+include "debug_map.inc"
+
+t16:
+
+t16.register.R0?  equ [r:0x0]
+t16.register.R1?  equ [r:0x1]
+t16.register.R2?  equ [r:0x2]
+t16.register.R3?  equ [r:0x3]
+t16.register.R4?  equ [r:0x4]
+t16.register.R5?  equ [r:0x5]
+t16.register.R6?  equ [r:0x6]
+t16.register.R7?  equ [r:0x7]
+t16.register.R8?  equ [r:0x8]
+t16.register.R9?  equ [r:0x9]
+t16.register.R10? equ [r:0xA]
+t16.register.R11? equ [r:0xB]
+t16.register.R12? equ [r:0xC]
+t16.register.SP?  equ [r:0xD]
+t16.register.LR?  equ [r:0xE]
+t16.register.PC?  equ [r:0xF]
+
+macro t16.register.parse o, argument
+  match [=r:r], t16.register.argument
+    o = r
+  else
+    err "incorrect register argument"
+  end match
+end macro
+
+t16.flag.create EQ, [f:0000b]
+t16.flag.create NE, [f:0001b]
+t16.flag.create CS, [f:0010b]
+t16.flag.create HS, [f:0010b]
+t16.flag.create CC, [f:0011b]
+t16.flag.create LO, [f:0011b]
+t16.flag.create MI, [f:0100b]
+t16.flag.create PL, [f:0101b]
+t16.flag.create VS, [f:0110b]
+t16.flag.create VC, [f:0111b]
+t16.flag.create HI, [f:1000b]
+t16.flag.create LS, [f:1001b]
+t16.flag.create GE, [f:1010b]
+t16.flag.create LT, [f:1011b]
+t16.flag.create GT, [f:1100b]
+t16.flag.create LE, [f:1101b]
+t16.flag.create AL, [f:1110b]
+t16.flag.create NV, [f:1111b]
+
+macro t16.flag.create name*, enc*
+  t16.flag.name? equ enc
+  t16.flags equ name
+end macro
+
+macro t16.flag.parse o, argument*
+  match [=f:f], t16.flag.argument
+    o = f
+  else
+    err "incorrect flag argument"
+  end match
+end macro
+
+macro t16.instruction.create name*, opc*, enc*
+  t16.instruction.opcode.name.opcode = opc
+  t16.instruction.opcode.name.encoding equ enc
+  t16.instruction.opcodes equ name
+end macro
+
+macro t16.instruction.create.alu name*, opcode*
+  local c1, c2
+  c1 = opcode
+  c2 = c1 + 1
+  t16.instruction.create name#I, c1, RRI
+  t16.instruction.create name#R, c2, RRR
+end macro
+
+t16.instruction.create.alu ADD, 0x0
+t16.instruction.create.alu SUB, 0x2
+t16.instruction.create.alu AND, 0x4
+t16.instruction.create.alu XOR, 0x6
+t16.instruction.create.alu SHR, 0x8
+
+t16.instruction.create LDLI, 0xA, RII
+t16.instruction.create LDUI, 0xB, RII
+t16.instruction.create LDR, 0xC, RRI
+t16.instruction.create STR, 0xD, RRI
+t16.instruction.create t16.BS, 0xE, CII
+t16.instruction.create INTI, 0xF, III
+
+macro t16.nybble v*
+  if v > 0xF | v < 0
+    err "illegal nybble"
+  end if
+end macro
+
+macro t16.instruction.generate o0*, o1*, o2*, o3*
+  if $ and 1 <> 0
+    err "Misaligned Instruction"
+  end if
+
+  t16.nybble o0
+  t16.nybble o1
+  t16.nybble o2
+  t16.nybble o3
+  
+  dw o0 shl 12 or o1 shl 8 or o2 shl 4 or o3
+end macro
+
+macro t16.instruction.generate.RRR op*, rd*, rs1*, rs2*
+  local o1, o2, o3
+  t16.register.parse o1, rd
+  t16.register.parse o2, rs1
+  t16.register.parse o3, rs2
+  t16.instruction.generate op, o1, o2, o3
+end macro
+
+macro t16.instruction.generate.CII op*, c*, i*
+  local o1, o2, o3, o23
+  if i > 0x7F | i < -0x80
+    err "Branch range too large"
+  end if
+  t16.flag.parse o1, c
+  o23 = i
+  o2 = (o23 shr 4) and 0xF
+  o3 = o23 and 0xF
+  t16.instruction.generate op, o1, o2, o3
+end macro
+
+macro t16.instruction.generate.RRI op*, rd*, rs*, i*
+  local o1, o2, o3
+  t16.register.parse o1, rd
+  t16.register.parse o2, rs
+  o3 = i
+  t16.instruction.generate op, o1, o2, o3
+end macro
+
+macro t16.instruction.generate.RII op*, rd*, i*
+  local o1, o2, o3, o23
+  t16.register.parse o1, rd
+  o23 = i
+  o2 = o23 shr 4
+  o3 = o23 and 0xF
+  t16.instruction.generate op, o1, o2, o3
+end macro
+
+macro t16.instruction.generate.III op*, a*, b*, c*
+  local o1, o2, o3
+  o1 = a
+  o2 = b
+  o3 = c
+  t16.instruction.generate op, o1, o2, o3
+end macro
+
+irpv name, t16.instruction.opcodes
+  macro name? args&
+    local opcode
+    opcode = t16.instruction.opcode.name.opcode
+    match RRR, t16.instruction.opcode.name.encoding
+      t16.instruction.generate.RRR t16.instruction.opcode.name.opcode, args
+    else match CII, t16.instruction.opcode.name.encoding
+      t16.instruction.generate.CII t16.instruction.opcode.name.opcode, args
+    else match RRI, t16.instruction.opcode.name.encoding
+      t16.instruction.generate.RRI t16.instruction.opcode.name.opcode, args
+    else match III, t16.instruction.opcode.name.encoding
+      t16.instruction.generate.RII t16.instruction.opcode.name.opcode, args
+    else match III, t16.instruction.opcode.name.encoding
+      t16.instruction.generate.III t16.instruction.opcode.name.opcode, args
+    end match
+  end macro
+end irpv
+
+macro NOP?
+  ADDI R0, R0, 0
+end macro
+
+; Load Immediate
+macro LDI? r*, _i*
+  local i, i1, ih, is
+  i = _i
+  if i > 0xFFFF | i < -0x8000
+    err "Immediate value is out of range"
+  end if
+  il = i and 0xFF
+  ih = i shr 8 and 0xFF
+  if ih = 0x00
+    LDLI r, il
+  else if ih = 0xFF & il > 0xF0
+    SUBI r, R0, 0x100 - il
+  else
+    match =PC, r
+      LDR PC, PC, 2
+      dw i
+    else
+      LDLI r, il
+      LDUI r, ih
+    end match
+  end if
+end macro
+
+macro MOV? rd*, rs*
+  ADDI rd, rs, 0
+end macro
+
+irpv name, t16.flags
+  macro B#name? target*
+    t16.BS name, target - ($ + 2)
+  end macro
+end irpv
+
+macro HALT?
+  local loop
+loop:
+  B loop
+end  macro
+
+macro INT?
+  INTI 0, 0, 0
+end macro
+
+; Branch immediate
+macro B? _addr_target*
+  local addr_target, addr_current, offset
+  addr_target = _addr_target
+  addr_current = $ + 2
+  offset = addr_target - addr_current
+
+  if offset = 0
+    NOP
+  else if offset >= -0x80 & offset <= 0x7F
+    BAL addr_target
+  else
+    LDI PC, addr_target - 2
+  end if
+end macro
+
+; Branch register
+macro BR? r*
+  SUBI PC, r, 2
+end macro
+
+; Call (branch immediate and link)
+macro CALL? _addr_target
+  local before, after
+  ADDI LR, PC, after - before + 2
+before:
+  B _addr_target
+after:
+end macro
+
+; Call (branch register and link)
+macro CALLR? rs
+  local before, after
+  ADDI LR, PC, after - before + 2
+before:
+  BR rs
+after:
+end macro
+
+macro RET?
+  BR LR
+end macro
+
+macro CMPI? a*, b*
+  if b >= 0
+    SUBI R0, a, b
+  else
+    ADDI R0, a, -b
+  end if
+end macro
+
+macro CMPR? a*, b*
+  SUBR R0, a, b
+end macro
+
+macro TESTI? a*, b*
+  andi r0, a, b
+end macro
+macro TESTR? a*, b*
+  andr r0, a, b
+end macro
+
+macro NEG? d*, s*
+  SUBR d, r0, s
+end macro
+
+macro align size:2
+  local pos
+  pos = $ mod size
+  if pos <> 0
+    db size - pos dup 0xFF
+  end if
+end macro
+
+postpone
+  ; Ensure the binary ends on an even byte
+  align
+end postpone
+
+; Define a procedure
+; Won't be assembled unless it is referenced
+macro proc name
+  align
+  name:
+  esc if used name
+end macro
+
+macro end?.proc!
+  esc end if
+end macro
+
+; Macros for defining global data
+virtual at 0x8000
+  ; rodata::
+  t16.bss::
+  t16.bss_start:
+end virtual
+
+postpone
+  virtual t16.bss
+    t16.bss_end:
+  end virtual
+end postpone
+
+macro global? name*, _size*, _alignment:1
+  local size, alignment
+  size = _size
+  alignment = _alignment
+
+  virtual t16.bss
+      align alignment
+    name:
+      rb size
+  end virtual
+end macro
+
+t16.bss_size = t16.bss_end - t16.bss_start
+
+dbg               ; Enable debug symbols
+
+if $ <> 0
+  err "tiny16.t16inc must be included first"
+end if
+
+if defined main
+  t16.entrypoint:
+    if t16.bss_size > 0
+      .bss_size_words = (t16.bss_size + 1) / 2  ; Round up to the nearest word
+      ldi r1, .bss_size_words
+      ldi r2, 0x8000
+    .clear_bss_loop:
+      str r0, r2, 0
+      addi r2, r2, 2
+      subi r1, r1, 1
+      bne .clear_bss_loop
+    end if
+            
+    ldi r1, 0     ; Initialize all registers to zero
+    ldi r2, 0
+    ldi r3, 0
+    ldi r4, 0
+    ldi r5, 0
+    ldi r6, 0
+    ldi r7, 0
+    ldi r8, 0
+    ldi r9, 0
+    ldi r10, 0
+    ldi r11, 0
+    ldi r12, 0
+    ldi sp, 0     ; Start with an empty stack (sp = 0x10000)
+
+    call main
+
+  .halt:
+    int
+    b .halt
+else
+  err "Label main must be defined"
+end if

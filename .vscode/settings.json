@@ -1,0 +1,13 @@
+{
+  "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
+  "files.associations": {
+    "*.inc": "plaintext",
+    "*.s": "plaintext"
+  },
+  "workbench.editor.defaultBinaryEditor": "hexEditor.hexedit",
+  "verilog.formatting.verilogHDL.formatter": "verible-verilog-format",
+  "[systemverilog]": {
+      "editor.defaultFormatter": "mshr-h.veriloghdl"
+  },
+  "verilog.languageServer.svls.enabled": true,
+}

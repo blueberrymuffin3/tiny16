@@ -1,0 +1,99 @@
+include "lib/tiny16.t16inc"
+include "lib/console.t16inc"
+include "lib/math.t16inc"
+include "lib/printf.t16inc"
+
+proc main
+  subi sp, sp, 10
+  str lr, sp, 8     ; Save lr on the stack
+
+  call console_init
+
+  ldi r1, 0x1234
+  str r1, sp, 0
+  ldi r1, 0x5678
+  str r1, sp, 2
+  ldi r1, 0x9ABC
+  str r1, sp, 4
+  ldi r1, 0xDEF0
+  str r1, sp, 6
+  ldi r1, data_str.hex_fmt
+  call printf
+
+macro .call_test_div a, b
+  ldi r1, a
+  ldi r2, b
+  call test_div
+end macro
+
+macro .call_test_mul a, b
+  ldi r1, a
+  ldi r2, b
+  call test_mul
+end macro
+
+  .call_test_div 5, 0
+  .call_test_div 5, 1
+  .call_test_div 5, 2
+  .call_test_div 5, 3
+  .call_test_div 5, 4
+  .call_test_div 5, 5
+  .call_test_div 5, 6
+  .call_test_div 38363, 7259
+  .call_test_div 7259, 38363
+
+  .call_test_mul 5, 0
+  .call_test_mul 5, 1
+  .call_test_mul 5, 2
+  .call_test_mul 5, 3
+  .call_test_mul 5, 4
+  .call_test_mul 5, 5
+  .call_test_mul 5, 6
+  .call_test_mul 160, 120
+  .call_test_mul 120, 160
+  .call_test_mul 320, 240 ; (overflows)
+  .call_test_mul 240, 320 ; (overflows)
+
+  ldr lr, sp, 8     ; Restore lr from the stack
+  addi sp, sp, 10
+  ret
+end proc
+
+proc test_div
+  subi sp, sp, 10
+  str lr, sp, 8     ; Save lr on the stack
+  str r1, sp, 0
+  str r2, sp, 2
+  call math_divide_word_unsigned
+  str r1, sp, 4
+  str r2, sp, 6
+  ldi r1, data_str.div_fmt
+  call printf
+
+  ldr lr, sp, 8     ; Restore lr from the stack
+  addi sp, sp, 10
+  ret
+end proc
+
+proc test_mul
+  subi sp, sp, 8
+  str lr, sp, 6     ; Save lr on the stack
+  str r1, sp, 0
+  str r2, sp, 2
+  call math_mult_word
+  str r1, sp, 4
+  ldi r1, data_str.mul_fmt
+  call printf
+
+  ldr lr, sp, 6     ; Restore lr from the stack
+  addi sp, sp, 8
+  ret
+end proc
+
+data_str:
+  .hex_fmt:
+    format_string "----- tiny16 console -----\n0x%x_%x_%x_%x\n\n"
+  .div_fmt:
+    format_string "%ud / %ud = %ud mod %ud\n"
+  .mul_fmt:
+    format_string "%ud * %ud = %ud\n"

@@ -1,0 +1,24 @@
+{
+  "Procedure": {
+    "prefix": "proc",
+    "body": [
+      "proc ${1:name}",
+      "\t; Args:",
+      "\t;   r1: argument",
+      "\t; Vars:",
+      "\t;   r1: variable",
+      "\t; Returns:",
+      "\t;   r1: return",
+      "\t\tsubi sp, sp, 2",
+      "\t\tstr lr, sp, 0",
+      "",
+      "\t\t${0:b .exit}",
+      "",
+      "\t.exit:",
+      "\t\tldr lr, sp, 0",
+      "\t\taddi sp, sp, 2",
+      "\t\tret",
+      "end proc"
+    ]
+  }
+}

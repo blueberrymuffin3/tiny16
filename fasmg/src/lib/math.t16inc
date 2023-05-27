@@ -1,0 +1,184 @@
+proc math_divide_word_signed
+  ; Args:
+  ;   r1: dividend
+  ;   r2: divisor
+  ; Return:
+  ;   r1: quotient
+  ;   r2: remainder
+    subi sp, sp, 6
+    str lr, sp, 0
+    str r8, sp, 2
+    str r9, sp, 4
+
+    mov r8, r1
+    mov r9, r2
+
+    cmpi r1, 0
+    bge .r1_pos
+    neg r1, r1
+  .r1_pos:
+
+    cmpi r2, 0
+    bge .r2_pos
+    neg r2, r2
+  .r2_pos:
+
+    call math_divide_word_unsigned
+
+    xorr r0, r8, r9
+    bpl .positive_quotent
+  .negative_quotent:
+    neg r1, r1
+  .positive_quotent:
+    ; TODO: Determine correct modulus
+
+  .exit:
+    ldr lr, sp, 0
+    ldr r8, sp, 2
+    ldr r9, sp, 4
+    addi sp, sp, 6
+    ret
+end proc
+
+proc math_divide_word_unsigned
+  ; Args:
+  ;   r1: dividend
+  ;   r2: divisor
+  ; Return:
+  ;   r1: quotient
+  ;   r2: remainder
+  ; Vars:
+  ;   r1: num
+  ;   r2: divisor
+  ;   r3: rem
+  ;   r6: -1
+  ;   r7: counter
+
+    ldi r3, 0
+    ldi r6, -1
+    ldi r7, 16
+
+  .loop:
+    shrr r3, r3, r6   ; rem <<= 1
+    shrr r1, r1, r6   ; num <<= 1
+    bcc .no_overflow  ; if overflow
+    addi r3, r3, 1    ; - rem++
+  .no_overflow:
+    cmpr r3, r2
+    bhs .emit_zero    ; if rem < divisor
+    subr r3, r3, r2   ; - rem -= divisor
+    addi r1, r1, 1    ; - num++ if we did
+  .emit_zero:
+
+    subi r7, r7, 1
+    bne .loop         ; Continue Loop if counter != 0
+
+    mov r2, r3        ; Setup return values
+    ret
+end proc
+
+proc math_mult_word
+  ; Args:
+  ;   r1: op1
+  ;   r2: op2
+  ; Return:
+  ;   r1: result
+  ; Vars:
+  ;   r1: op1
+  ;   r2: op2
+  ;   r3: result
+  ;   r4: counter
+  ;   r5: -1
+    ldi r3, 0
+    ldi r4, 16
+    ldi r5, 0xFFFF
+    b .loop_start
+  .loop:
+    shrr r3, r3, r5
+  .loop_start:
+    shrr r1, r1, r5
+    bvc .emit_zero    ; if overflow
+    addr r3, r3, r2   ; - result++
+  .emit_zero:
+    subi r4, r4, 1
+    bne .loop
+
+    mov r1, r3
+    ret
+end proc
+
+proc math_rand_seed
+  ; Args:
+  ;   r1: seed
+  ;   r2: seed
+  global RANDOM_STATE, 4
+
+  ldi r7, RANDOM_STATE
+  str r1, r7, 0
+  str r2, r7, 2
+
+  ret
+end proc
+
+proc math_rand
+  ; Note: math_seed MUST be called first
+  ; Vars:
+  ;   r1: lstate
+  ;   r2: hstate
+  ;   r3: tmp1
+  ;   r4: tmp2
+  ;   r5: tmp3
+  ; Returns:
+  ;   r1: random
+  ;   r2: random
+  ldi r7, RANDOM_STATE
+  ldr r1, r7, 0
+  ldr r2, r7, 2
+
+  ; x ^= x << 13
+  ldi r6, -13
+  shrr r3, r1, r6
+  shri r4, r1, 3
+  shrr r5, r2, r6
+  xorr r1, r1, r3
+  xorr r2, r2, r4
+  xorr r2, r2, r5
+  
+	; x ^= x >> 17
+  shri r3, r2, 1
+  xorr r1, r1, r3
+
+	; x ^= x << 5
+  ldi r6, -5
+  shrr r3, r1, r6
+  shri r4, r1, 11
+  shrr r5, r2, r6
+  xorr r1, r1, r3
+  xorr r2, r2, r4
+  xorr r2, r2, r5
+
+  str r1, r7, 0
+  str r2, r7, 2
+
+  ret
+end proc
+
+proc math_rand_int
+  ; Args:
+  ;   r1: max value (exclusive)
+  ; Returns:
+  ;   r1: random value
+    subi sp, sp, 4
+    str lr, sp, 2
+
+    str r1, sp, 0
+    call math_rand
+    ldr r2, sp, 0
+    call math_divide_word_unsigned
+    mov r1, r2
+
+  .exit:
+    ldr lr, sp, 2
+    addi sp, sp, 4
+    ret
+end proc

@@ -1,0 +1,37 @@
+include "lib/tiny16.t16inc"
+include "lib/console.t16inc"
+include "lib/math.t16inc"
+include "lib/printf.t16inc"
+
+proc main
+    subi sp, sp, 10
+    str lr, sp, 8
+
+    ldi r1, 0x6da9
+    ldi r2, 0xf80d
+    call math_rand_seed
+
+    call console_init
+
+    ldi r8, 16
+.loop:
+    call math_rand
+    str r1, sp, 0
+    str r2, sp, 2
+    ldi r2, 1000
+    call math_divide_word_unsigned
+    str r2, sp, 4
+    ldi r1, data_str.line_fmt
+    call printf
+
+    subi r8, r8, 1
+    bne .loop
+
+    ldr lr, sp, 8
+    addi sp, sp, 0
+    ret
+end proc
+
+data_str:
+  .line_fmt:
+    format_string "%x_%x: %d\n"

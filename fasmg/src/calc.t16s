@@ -1,0 +1,288 @@
+include "lib/tiny16.t16inc"
+include "lib/console.t16inc"
+include "lib/math.t16inc"
+
+TOKEN_TYPE:
+  .ERROR := 0
+  .NUMBER := 1
+  .OPERATOR := 2
+  .EOF := 3
+
+ERRORS:
+  .INT_TOO_LARGE := data_str.err_int_too_large
+
+proc main
+    subi sp, sp, 4
+    str lr, sp, 0     ; Save lr on the stack
+    str r8, sp, 2     ; Save r8 on the stack
+
+    call console_init
+
+    ldi r1, data_str.header
+    call console_print_byte_string
+
+  .BUFSIZE := 150
+    ldi r1, .BUFSIZE
+    subr sp, sp, r1   ; alloca(.BUFSIZE)
+
+  .read_loop:
+    ldi r1, data_str.prompt
+    call console_print_byte_string
+    mov r1, sp
+    ldi r2, .BUFSIZE / 2
+    call console_read_line
+    mov r1, sp
+    call calc_eval
+    cmpi r1, 0
+    bne .print_error
+    mov r1, r2
+    call console_print_word_signed
+    ldi r1, console_addr
+    ldi r2, 0x0A
+    str r2, r1, console_offset_io
+    b .read_loop
+  .print_error:
+    mov r8, r1
+    ldi r1, data_str.error_1
+    call console_print_byte_string
+    mov r1, r8
+    call console_print_byte_string
+    ldi r1, data_str.error_2
+    call console_print_byte_string
+    b .read_loop
+
+    ldi r1, .BUFSIZE
+    addr sp, sp, r1   ; freea(.BUFSIZE)
+    ldr lr, sp, 0     ; Restore lr from the stack
+    ldr r8, sp, 2
+    addi sp, sp, 4
+    ret
+end proc
+
+proc calc_eval
+  ; Args:
+  ;   r1: cursor
+  ; Vars:
+  ;   r1: cursor
+  ;   r2: token type
+  ;   r3: token value
+  ;   r8: number stack size
+  ;   r9: operand 1
+  ;   r10: operand 2
+  ;   r11: save cursor
+  ; Returns:
+  ;   r1: error string
+  ;   r2: result
+    subi sp, sp, 2
+    str lr, sp, 0
+
+    ldi r8, 0
+
+  .read_loop:
+    call read_token
+    ; switch(r2)
+    addr r7, r2, r2
+    addr r7, r7, pc
+    ldr pc, r7, 4
+    dw .handle_error - 2
+    dw .handle_number - 2
+    dw .handle_oprator - 2
+    dw .handle_eof - 2
+
+  .handle_error:
+    addr sp, sp, r8 ; Clear number stack (sp -= r8 * 2)
+    mov r1, r3      ; Return error string
+    b .exit
+
+  .handle_number:
+    addi r8, r8, 2
+    subi sp, sp, 2
+    str r3, sp, 0
+    b .read_loop
+
+  .handle_oprator:
+    cmpi r8, 4
+    bge .operands_ok
+    ldi r3, data_str.err_missing_operand
+    b .handle_error
+  .operands_ok:
+    subi r8, r8, 4      ; pop 2 numbers from the stack
+    ldr r9, sp, 2
+    ldr r10, sp, 0
+    addi sp, sp, 4
+
+    ldi r7, 0x2B    ; '+'
+    cmpr r3, r7
+    beq .handle_oprator_add
+    ldi r7, 0x2D    ; '-'
+    cmpr r3, r7
+    beq .handle_oprator_sub
+
+    ; Prep args for fn call (dedup code)
+    mov r11, r1
+    mov r1, r9
+    mov r2, r10
+
+    ldi r7, 0x2A    ; '*'
+    cmpr r3, r7
+    beq .handle_oprator_mult
+    ldi r7, 0x2F    ; '/'
+    cmpr r3, r7
+    beq .handle_oprator_div
+    ldi r7, 0x25    ; '%'
+    cmpr r3, r7
+    beq .handle_oprator_mod
+
+    ldi r3, data_str.err_unknown_operator
+    b .handle_error
+
+  .handle_oprator_add:
+    addr r3, r9, r10
+    bvs .handle_overflow
+    b .handle_number
+  .handle_oprator_sub:
+    subr r3, r9, r10
+    bvs .handle_overflow
+    b .handle_number
+  .handle_oprator_mult:
+    call math_mult_word
+    ; TODO: Check for overflow
+    mov r3, r1
+    mov r1, r11
+    b .handle_number
+  .handle_oprator_div:
+    call math_divide_word_signed
+    ; TODO: Check for overflow
+    mov r3, r1
+    mov r1, r11
+    b .handle_number
+  .handle_oprator_mod:
+    call math_divide_word_unsigned
+    ; TODO: Check for overflow
+    mov r3, r2
+    mov r1, r11
+    b .handle_number
+
+  .handle_overflow:
+    ldi r3, data_str.err_overflow
+    b .handle_error
+
+  .handle_eof:
+    cmpi r8, 2
+    beq .handle_eof_ok
+    ; We have too many values on the stack
+    ldi r3, data_str.err_unexpected_end
+    b .handle_error
+  .handle_eof_ok:
+    ldi r1, 0
+    ldr r2, sp, 0
+    addi sp, sp, 2
+    ; b .exit
+
+  .exit:
+    ldr lr, sp, 0
+    addi sp, sp, 2
+    ret
+end proc
+
+proc read_token
+  ; Args:
+  ;   r1: cursor
+  ; Vars:
+  ;   r1: cursor
+  ;   r2: char
+  ;   r3: token value
+  ;   r7: tmp
+  ; Returns:
+  ;   r1: cursor
+  ;   r2: token type
+  ;   r3: token value
+
+    ldi r3, 0
+  
+  .loop:
+    ldr r2, r1, 0
+    cmpi r2, 0
+    beq .eof
+    ldi r7, 0x20
+    cmpr r2, r7
+    beq .whitespace
+    ldi r7, 0x30
+    cmpr r2, r7
+    blt .operator
+    ldi r7, 0x39
+    cmpr r2, r7
+    bgt .operator
+    b .number_start
+
+  .whitespace:
+    addi r1, r1, 2
+    b .loop
+
+  .number_loop:
+    ldr r2, r1, 0
+    ldi r7, 0x30
+    cmpr r2, r7
+    blt .number_end
+    ldi r7, 0x39
+    cmpr r2, r7
+    bgt .number_end
+
+    ; value *= 10:
+    addr r3, r3, r3
+    bvs .number_error
+    addr r7, r3, r3
+    bvs .number_error
+    addr r7, r7, r7
+    bvs .number_error
+    addr r3, r3, r7
+    bvs .number_error
+
+  .number_start:
+    ; value += char - 0x30
+    ldi r7, 0x30
+    subr r2, r2, r7
+    addr r3, r3, r2
+    bcs .number_error
+    addi r1, r1, 2
+    b .number_loop
+
+  .number_end:
+    ldi r2, TOKEN_TYPE.NUMBER
+    ret
+
+  .number_error:
+    ldi r2, TOKEN_TYPE.ERROR
+    ldi r3, ERRORS.INT_TOO_LARGE
+    ret
+
+  .eof:
+    ldi r2, TOKEN_TYPE.EOF
+    ret
+
+  .operator:
+    mov r3, r2
+    ldi r2, TOKEN_TYPE.OPERATOR
+    addi r1, r1, 2
+    ret
+end proc
+
+data_str:
+  .error_1:
+    db 0x1B, "[31m", "Error: ", 0
+  .error_2:
+    db 0x1B, "[0m", 0x0A, 0
+  .err_int_too_large:
+    db "Number too large", 0
+  .err_missing_operand:
+    db "Missing operands", 0
+  .err_unknown_operator:
+    db "Unkown operator", 0
+  .err_overflow:
+    db "Integer overflow", 0
+  .err_unexpected_end:
+    db "Unexpected end", 0
+  .prompt:
+    db 0x1B, "[32m", " > ", 0x1B, "[0m", 0
+  .header:
+    db 0x1B, "[36m", " ----- tiny16 reverse-polish-notation calculator -----", 0x1B, "[0m", 0x0A, 0

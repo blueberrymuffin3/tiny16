@@ -1,0 +1,164 @@
+include "lib/tiny16.t16inc"
+include "lib/console.t16inc"
+include "lib/math.t16inc"
+
+proc main
+  subi sp, sp, 2
+  str lr, sp, 0     ; Save lr on the stack
+
+  call console_init
+
+  ldi r1, data_str.header
+  call console_print_byte_string
+  
+  ldi r1, data_str.0x
+  call console_print_byte_string
+
+  ldi r1, 0x1234
+  call console_print_word_hex
+  ldi r1, data_str.hex_sep
+  call console_print_byte_string
+  ldi r1, 0x5678
+  call console_print_word_hex
+  ldi r1, data_str.hex_sep
+  call console_print_byte_string
+  ldi r1, 0x9ABC
+  call console_print_word_hex
+  ldi r1, data_str.hex_sep
+  call console_print_byte_string
+  ldi r1, 0xDEF0
+  call console_print_word_hex
+
+  ldi r1, data_str.nl
+  call console_print_byte_string
+  ldi r1, data_str.nl
+  call console_print_byte_string
+
+macro .call_test_div a, b
+  ldi r1, a
+  ldi r2, b
+  call test_div
+end macro
+
+macro .call_test_mul a, b
+  ldi r1, a
+  ldi r2, b
+  call test_mul
+end macro
+
+  .call_test_div 5, 0
+  .call_test_div 5, 1
+  .call_test_div 5, 2
+  .call_test_div 5, 3
+  .call_test_div 5, 4
+  .call_test_div 5, 5
+  .call_test_div 5, 6
+  .call_test_div 38363, 7259
+  .call_test_div 7259, 38363
+
+  .call_test_mul 5, 0
+  .call_test_mul 5, 1
+  .call_test_mul 5, 2
+  .call_test_mul 5, 3
+  .call_test_mul 5, 4
+  .call_test_mul 5, 5
+  .call_test_mul 5, 6
+  .call_test_mul 160, 120
+  .call_test_mul 120, 160
+  .call_test_mul 320, 240 ; (overflows)
+  .call_test_mul 240, 320 ; (overflows)
+
+  ldr lr, sp, 0     ; Restore lr from the stack
+  addi sp, sp, 2
+  ret
+end proc
+
+proc test_div
+  subi sp, sp, 2
+  str lr, sp, 0     ; Save lr on the stack
+
+  mov r8, r1
+  mov r9, r2
+
+  mov r1, r8
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.div
+  call console_print_byte_string
+
+  mov r1, r9
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.eq
+  call console_print_byte_string
+
+  mov r1, r8
+  mov r2, r9
+  call math_divide_word_unsigned
+  mov r8, r1
+  mov r9, r2
+  call console_print_word_unsigned
+
+  ldi r1, data_str.mod
+  call console_print_byte_string
+
+  mov r1, r9
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.nl
+  call console_print_byte_string
+
+  ldr lr, sp, 0     ; Restore lr from the stack
+  addi sp, sp, 2
+  ret
+end proc
+
+proc test_mul
+  subi sp, sp, 2
+  str lr, sp, 0     ; Save lr on the stack
+
+  mov r8, r1
+  mov r9, r2
+
+  mov r1, r8
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.mul
+  call console_print_byte_string
+
+  mov r1, r9
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.eq
+  call console_print_byte_string
+
+  mov r1, r8
+  mov r2, r9
+  call math_mult_word
+  call console_print_word_unsigned
+  
+  ldi r1, data_str.nl
+  call console_print_byte_string
+
+  ldr lr, sp, 0     ; Restore lr from the stack
+  addi sp, sp, 2
+  ret
+end proc
+
+data_str:
+  .header:
+    db "----- tiny16 console -----", 0x0A, 0
+  .0x:
+    db "0x", 0
+  .nl:
+    db 0x0A, 0
+  .hex_sep:
+    db "_", 0
+  .div:
+    db " / ", 0
+  .mul:
+    db " * ", 0
+  .eq:
+    db " = ", 0
+  .mod:
+    db " mod ", 0

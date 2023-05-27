@@ -1,0 +1,83 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Tiny16 Assembly",
+	"patterns": [
+		{
+			"patterns": [{
+				"name": "comment.line.t16",
+				"match": "(;).*$"
+			}]
+		},
+		{
+			"patterns": [{
+				"name": "keyword.control.instruction.real",
+				"match": "(?i)^\\s*((?:(?:add|sub|and|xor|shr)(?:r|i))|(?:ldli|ldui|ldr|str|inti))\\b"
+			}]
+		},
+		{
+			"patterns": [{
+				"name": "keyword.control.instruction.pseudo",
+				"match": "(?i)^\\s*(((?:cmp|test)(?:r|i))|(?:nop|ldi|mov|b|halt|int|br|call|ret|neg)|b(?:eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|nv))\\b"
+			}]
+		},
+		{
+			"patterns": [{
+				"name": "keyword.control.macro",
+				"match": "(?i)^\\s*(include|file|proc|end proc|(?:))\\b"
+			}]
+		},
+		{
+      "patterns": [
+        {
+          "match": "\\b(r0|r1|r2|r3|r4|r5|r6|r7|r8|r9|r10|r11|r12|sp|lr|pc)\\b",
+          "name": "storage.register"
+        }
+      ]
+    },
+		{
+      "patterns": [
+        {
+          "match": "(\\b|^\\s*)[a-zA-Z_][0-9a-zA-Z_]*\\b",
+          "name": "variable.t16"
+        }
+      ]
+    },
+		{
+      "patterns": [
+        {
+          "match": "(?i)(0x|\\$)[0-9a-fA-F]+\\b",
+          "name": "constant.numeric.prefix.hex.t16"
+        },
+        {
+          "match": "(?i)[0-9][0-9a-fA-F]*[bhoq]?\\b",
+          "name": "constant.numeric.suffix.t16"
+        }
+      ]
+    },
+		{
+			"name": "string.quoted.double.t16",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [{
+				"include": "#string-escape-codes"
+			}]
+		},
+		{
+			"name": "string.quoted.single.t16",
+			"begin": "'",
+			"end": "'",
+			"patterns": [{
+				"include": "#string-escape-codes"
+			}]
+		}
+	],
+	"repository": {
+		"string-escape-codes": {
+			"patterns": [{
+				"name": "constant.character.escape",
+				"match": "(\\\\.)|(%[bwu0-9]*?[xdsc%])"
+			}]
+		}
+	},
+	"scopeName": "source.tiny16asm"
+}

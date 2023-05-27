@@ -1,0 +1,31 @@
+{
+  "name": "tiny16asm",
+  "displayName": "tiny16asm",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.78.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "tiny16asm",
+      "aliases": ["Tiny16 Assembly", "tiny16asm"],
+      "extensions": [".t16s",".t16inc"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "tiny16asm",
+      "scopeName": "source.tiny16asm",
+      "path": "./syntaxes/tiny16asm.tmLanguage.json"
+    }],
+    "snippets": [
+      {
+        "language": "tiny16asm",
+        "path": "./snippets.json"
+      }
+    ]
+  }
+}

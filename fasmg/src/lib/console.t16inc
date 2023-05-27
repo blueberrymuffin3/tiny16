@@ -1,0 +1,217 @@
+console_addr = 0x7000
+console_offset_io = 0
+console_offset_init = 2
+
+proc console_init
+  ldi r1, 1
+  ldi r2, console_addr
+  str r1, r2, console_offset_init
+  ret
+end proc
+
+proc console_print_word_string
+  ; r1: pointer to string
+  ; r7: console_addr
+    ldi r7, console_addr
+  .loop:
+    ldr r2, r1, 0
+    beq .exit
+    str r2, r7, console_offset_io
+    addi r1, r1, 2
+    b .loop
+  .exit:
+    ret
+end proc
+
+proc console_print_byte_string
+  ; r1: pointer to string
+  ; r2: pair
+  ; r3: char
+  ; r4: 0xFF
+  ; r5: console_addr
+  ; returns: void
+
+    ldi r4, 0xFF
+    ldi r5, console_addr
+
+    andi r0, r1, 1 ; Check if we're starting on an odd byte
+    beq .loop ; start on even byte
+    subi r1, r1, 1 ; start odd byte
+    ldr r2, r1, 0
+    b .loop_start_odd
+  .loop:
+    ldr r2, r1, 0
+    andr r3, r2, r4
+    beq .exit
+    str r3, r5, console_offset_io
+  .loop_start_odd:
+    shri r3, r2, 8
+    beq .exit
+    str r3, r5, console_offset_io
+    addi r1, r1, 2
+    b .loop
+  .exit:
+    ret
+end proc
+
+proc console_print_word_hex
+  ; r1: word to print
+  
+  ; vars
+  ;   r8: word
+
+  ; stack:
+  ;   sp, 0: saved LR
+  ;   sp, 2: saved R8
+
+    subi sp, sp, 4
+    str lr, sp, 0 ; Save LR
+    str r8, sp, 2 ; Save R8
+
+    mov r8, r1
+    shri r1, r8, 12
+    call console_print_nybble_hex
+    shri r1, r8, 8
+    andi r1, r1, 0xF
+    call console_print_nybble_hex
+    shri r1, r8, 4
+    andi r1, r1, 0xF
+    call console_print_nybble_hex
+    andi r1, r8, 0xF
+    call console_print_nybble_hex
+
+    ldr lr, sp, 0 ; Restore LR
+    ldr r8, sp, 2 ; Restore R8
+    addi sp, sp, 4
+    ret
+end proc
+
+proc console_print_nybble_hex
+  ; r1: nybble to print
+  ; r2: offset
+    
+    cmpi r1, 10
+    blo .letter
+    ldi r2, 0x30
+    b .print
+
+  .letter:
+    ldi r2, 0x37
+
+  .print:
+    addr r1, r1, r2
+    ldi r2, console_addr
+    str r1, r2, console_offset_io
+    ret
+end proc
+
+proc console_print_word_signed
+  ; Args:
+  ;   r1: dividend
+  cmpi r1, 0
+  bge .positive
+    neg r1, r1
+    ldi r2, console_addr
+    ldi r3, 0x2D
+    str r3, r2, console_offset_io
+  .positive:
+    b console_print_word_unsigned
+end proc
+
+proc console_print_word_unsigned
+  ; Args:
+  ;   r1: dividend
+  ; Vars:
+  ;   r8: remaining
+  ;   r9: cursor
+    subi sp, sp, 8
+    str lr, sp, 2     ; Save lr on the stack
+    str r8, sp, 4     ; Save r8 on the stack
+    str r9, sp, 6     ; Save r9 on the stack
+    addi r9, sp, 0    ; Buffer tail
+    subi sp, sp, 14   ; Make space for buffer
+
+    str r0, r9, 0
+    mov r8, r1
+  .loop:
+    subi r9, r9, 2
+    mov r1, r8
+    ldi r2, 10
+    call math_divide_word_unsigned
+    ldi r3, 0x30
+    addr r3, r3, r2   ; '0' + remainder
+    str r3, r9, 0
+    mov r8, r1
+    bne .loop
+
+    mov r1, r9
+    call console_print_word_string
+
+    addi sp, sp, 14   ; Make space for buffer
+    ldr lr, sp, 2     ; Restore lr from the stack
+    ldr r8, sp, 4     ; Restore r8 from the stack
+    ldr r9, sp, 6     ; Restore r9 from the stack
+    addi sp, sp, 8
+    ret
+end proc
+
+proc console_read_line
+  ; Args:
+  ;   r1: target buffer
+  ;   r2: max length (words)
+  ; Vars:
+  ;   r1: cursor
+  ;   r2: max_index
+  ;   r3: char
+  ;   r4: index
+  ; Returns:
+  ;   r1: string length (w/o null)
+    subi r2, r2, 1
+    ldi r4, 0
+  .read_loop:
+    ldi r7, console_addr
+    ldr r3, r7, console_offset_io       ; r9 = read character
+    cmpi r3, -1                         ; No data
+    beq .read_loop
+    cmpi r3, 0x08                       ; Check for backspace
+    beq .backspace
+    cmpi r3, 0x0A                       ; Check for newline
+    beq .newline
+    ldi r6, 0x20                        ; Ignore low unprintable
+    cmpr r3, r6
+    blt .read_loop
+    ldi r6, 0x7E                        ; Ignore high unprintable
+    cmpr r3, r6
+    bgt .read_loop
+
+    cmpr r4, r2                         ; Buffer full?
+    bge .bell
+    str r3, r1, 0
+    addi r1, r1, 2
+    addi r4, r4, 1
+    str r3, r7, console_offset_io
+    b .read_loop
+
+  .backspace:
+    cmpi r4, 0                          ; Buffer full?
+    beq .bell
+    subi r1, r1, 2
+    subi r4, r4, 1
+    str r3, r7, console_offset_io       ; Backspace
+    ldi r3, 0x20
+    str r3, r7, console_offset_io       ; Space
+    ldi r3, 0x08
+    str r3, r7, console_offset_io       ; Backspace
+    b .read_loop
+
+  .bell:
+    ldi r3, 0x07
+    str r3, r7, console_offset_io
+    b .read_loop
+
+  .newline:
+    str r3, r7, console_offset_io       ; Print newline
+    str r0, r1, 0
+    mov r1, r4
+    ret
+end proc
