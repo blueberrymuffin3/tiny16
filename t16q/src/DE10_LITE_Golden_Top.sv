@@ -123,9 +123,14 @@ module DE10_LITE_Golden_Top (
 `endif
 );
 
+  Clock clk;
+  ClockGen #(27) clkgen (MAX10_CLK1_50, clk);
+  assign LEDR[9] = clk.ph0;
+  assign LEDR[8] = clk.clk;
+
   assign HEX0 = 8'hFF;
   assign HEX1 = 8'hFF;
-  assign LEDR = SW;
+  assign LEDR[7:0] = SW[7:0];
   var [15:0] word;
 
   SevenSegWord hex0 (

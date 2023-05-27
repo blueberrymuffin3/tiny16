@@ -1,4 +1,6 @@
 # This file is from https://gist.github.com/nhasbun/71918796044b7ba89d6662133495f754
+# Ignore modelsim, we're not using it rn
+/simulation/modelsim
 
 # Working with Altera Quartus II (Q2) and do proper versioning is not that easy
 # but if you follow some rules it can be accomplished. :)

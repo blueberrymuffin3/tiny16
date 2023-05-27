@@ -7,7 +7,9 @@
   "workbench.editor.defaultBinaryEditor": "hexEditor.hexedit",
   "verilog.formatting.verilogHDL.formatter": "verible-verilog-format",
   "[systemverilog]": {
-      "editor.defaultFormatter": "mshr-h.veriloghdl"
+    "editor.defaultFormatter": "mshr-h.veriloghdl",
+    "editor.indentSize": 2,
+    "editor.detectIndentation": false
   },
   "verilog.languageServer.svls.enabled": true,
 }

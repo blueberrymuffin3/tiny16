@@ -19,8 +19,8 @@ module Registers (
   assign alu_rs1 = alu_rs1_i == 0 ? 16'b0 : regs[alu_rs1_i];
   assign alu_rs2 = alu_rs2_i == 0 ? 16'b0 : regs[alu_rs2_i];
 
-  always_ff @(posedge clk, negedge clk) begin
-    if (memory_load_en) regs[memory_index] <= memory_load;
-    if (alu_rd_i != 0) regs[alu_rd_i] <= alu_rd;
-  end
+  // always_ff @(posedge clk, negedge clk) begin
+  //   if (memory_load_en) regs[memory_index] <= memory_load;
+  //   if (alu_rd_i != 0) regs[alu_rd_i] <= alu_rd;
+  // end
 endmodule
