@@ -23,7 +23,7 @@
 // `define ENABLE_KEY
 `define ENABLE_LED 
 `define ENABLE_SW 
-// `define ENABLE_VGA
+`define ENABLE_VGA
 // `define ENABLE_ACCELEROMETER
 // `define ENABLE_ARDUINO
 `define ENABLE_GPIO 
@@ -95,10 +95,10 @@ module DE10_LITE_Golden_Top (
 
     //////////// VGA: 3.3-V LVTTL //////////
 `ifdef ENABLE_VGA
-    output [3:0] VGA_B,
-    output [3:0] VGA_G,
-    output       VGA_HS,
     output [3:0] VGA_R,
+    output [3:0] VGA_G,
+    output [3:0] VGA_B,
+    output       VGA_HS,
     output       VGA_VS,
 `endif
 
@@ -123,10 +123,26 @@ module DE10_LITE_Golden_Top (
 `endif
 );
 
+  bit clockpll_video;
+  bit clockpll_core;
+  clockpll clockpll(
+    .areset(0),
+    .inclk0(MAX10_CLK1_50),
+    .c0(clockpll_core),
+    .c1(clockpll_video),
+    .locked()
+  );
+
+  GPU gpu(
+    .clk(clockpll_video),
+    .rgb({VGA_R, VGA_G, VGA_B}),
+    .hs(VGA_HS),
+    .vs(VGA_VS)
+  );
+
   Clock clk;
-  ClockGen #(27) clkgen (MAX10_CLK1_50, clk);
-  assign LEDR[9] = clk.ph0;
-  assign LEDR[8] = clk.clk;
+  ClockGen #(12) clkgen (clockpll_core, clk);
+  assign LEDR[9:8] = {clk.ph1, clk.ph0};
 
   assign HEX0 = 8'hFF;
   assign HEX1 = 8'hFF;
