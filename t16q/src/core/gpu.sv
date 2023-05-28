@@ -1,5 +1,4 @@
-`define GPU_MODE_FHD
-
+`default_nettype none
 
 module GPU (
     input clk,

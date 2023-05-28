@@ -20,7 +20,7 @@
 `define ENABLE_HEX3 
 `define ENABLE_HEX4 
 `define ENABLE_HEX5 
-// `define ENABLE_KEY
+`define ENABLE_KEY
 `define ENABLE_LED 
 `define ENABLE_SW 
 `define ENABLE_VGA
@@ -79,7 +79,7 @@ module DE10_LITE_Golden_Top (
 `endif
 
     //////////// KEY: 3.3 V SCHMITT TRIGGER //////////
-`ifdef ENABLE_KEYword
+`ifdef ENABLE_KEY
     input [1:0] KEY,
 `endif
 
@@ -122,6 +122,8 @@ module DE10_LITE_Golden_Top (
     inout tri [35:0] GPIO
 `endif
 );
+  bit reset;
+  assign reset = !KEY[0];
 
   bit clockpll_video;
   bit clockpll_core;
@@ -140,16 +142,8 @@ module DE10_LITE_Golden_Top (
     .vs(VGA_VS)
   );
 
-  Clock clk;
-  ClockGen #(12) clkgen (clockpll_core, clk);
-  assign LEDR[9:8] = {clk.ph1, clk.ph0};
-
-  assign HEX0 = 8'hFF;
-  assign HEX1 = 8'hFF;
-  assign LEDR[7:0] = SW[7:0];
-  var [15:0] word;
-
-  SevenSegWord hex0 (
+  bit [15:0] word;
+  SevenSegWord hex_word (
       word,
       HEX2,
       HEX3,
@@ -157,14 +151,24 @@ module DE10_LITE_Golden_Top (
       HEX5
   );
 
-  MMU MMU (
-      .clk(0),
-      .w_en(0),
-      .addr({6'b0, SW, 1'b0}),
-      .data_w(0),
-      .data_r(word)
-  );
+  bit [3:0] n0;
+  SevenSegDigit hex0(n0, HEX0);
+  bit [3:0] n1;
+  SevenSegDigit hex1(n1, HEX1);
 
-  ALU alu();
-  Registers regs();
+  Core #(10) core(
+    .clkin(clockpll_core),
+    .reset(reset),
+    .debug_d(word),
+    .debug_rd(n0),
+    .debug_leds(LEDR)
+  );
+  // Core #(0) core(
+  //   .clkin(KEY[1]),
+  //   .reset(reset),
+  //   .debug_d(word),
+  //   .debug_mi(n1),
+  //   .debug_rd(n0),
+  //   .debug_leds(LEDR)
+  // );
 endmodule

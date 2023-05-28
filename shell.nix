@@ -16,6 +16,7 @@ pkgs.mkShell {
     }))
     pkgs.rustup
     pkgs.xterm
+    pkgs.python3
 
     # Verilog:
     # pkgs.verilog

@@ -1,3 +1,5 @@
+`default_nettype none
+
 typedef enum bit [2:0] {
   ADD,
   SUB,
@@ -7,19 +9,19 @@ typedef enum bit [2:0] {
   LDUI
 } ALUOp;
 
-typedef struct {
+typedef struct packed {
   bit z;
   bit c;
   bit n;
   bit v;
-} Flags;
+} ALUFlags;
 
 module ALU (
     input ALUOp op,
     input [15:0] s1,
     input [15:0] s2,
     output [15:0] d,
-    output Flags flags
+    output ALUFlags flags
 );
 
   logic [16:0] result;

@@ -6,7 +6,7 @@ typedef struct packed {
 } Clock;
 
 module ClockGen #(
-    parameter int DIVIDE = 4
+    parameter int DIVIDE = 0
 ) (
     input clkin,
     output Clock out
@@ -14,6 +14,8 @@ module ClockGen #(
   logic [DIVIDE:0] counter;
 
   always_ff @(posedge clkin) counter <= counter + 1;
-  assign out.ph0 = counter[DIVIDE-2];
-  assign out.ph1 = counter[DIVIDE-1];
+  assign out.ph0 = counter[DIVIDE];
+
+  // This clock must be assigned asynchronously to delay updating the combinatorial logic
+  always_ff @(negedge out.ph0) out.ph1 <= !out.ph1;
 endmodule
