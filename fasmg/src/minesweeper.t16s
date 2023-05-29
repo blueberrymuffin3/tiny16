@@ -36,7 +36,9 @@ proc main
     call math_rand_seed
     call generate_field
     call console_init
-    
+    ldi r1, data_str.clear_screen
+    call printf
+
   .reprint:
     ldi r1, data_str.cursor_hide
     call printf
@@ -431,6 +433,8 @@ proc get_input
 end proc
 
 data_str:
+  .clear_screen:
+    format_string "\e[2J"
   .cursor_hide:
     format_string "\e[?25l"
   .cursor_show:

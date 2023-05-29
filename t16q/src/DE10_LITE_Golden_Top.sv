@@ -177,7 +177,7 @@ module DE10_LITE_Golden_Top (
   assign mmio_in.uart_clk = clockpll_uart;
   assign GPIO[0] = mmio_out.uart_tx;
 
-  Core #(0) core (
+  Core core (
       .clkin(core_clkin),
       .reset(reset),
       .debug_d(word),

@@ -5,16 +5,11 @@ typedef struct packed {
   bit ph1;
 } Clock;
 
-module ClockGen #(
-    parameter int DIVIDE = 0
-) (
+module ClockGen (
     input clkin,
     output Clock out
 );
-  logic [DIVIDE:0] counter;
-
-  always_ff @(posedge clkin) counter <= counter + 1;
-  assign out.ph0 = counter[DIVIDE];
+  assign out.ph0 = clkin;
 
   // This clock must be assigned asynchronously to delay updating the combinatorial logic
   always_ff @(negedge out.ph0) out.ph1 <= !out.ph1;

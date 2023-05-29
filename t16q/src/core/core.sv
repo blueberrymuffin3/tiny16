@@ -1,8 +1,6 @@
 `default_nettype none
 
-module Core #(
-    int CLKDIV = 0
-) (
+module Core (
     input clkin,
     input reset,
     input MMIOIn mmio_in,
@@ -14,7 +12,7 @@ module Core #(
     output [ 9:0] debug_leds
 );
   Clock clk;
-  ClockGen #(CLKDIV) clkgen (
+  ClockGen clkgen (
       clkin,
       clk
   );
