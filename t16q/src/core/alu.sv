@@ -27,8 +27,6 @@ module ALU (
   logic [16:0] result;
   assign d = result[15:0];
 
-  logic [15:0] s2_effective;
-
   assign flags.z = result[15:0] == 0;
   assign flags.c = result[16];
   assign flags.n = result[15];
@@ -36,8 +34,8 @@ module ALU (
 
   always_comb
     case (op)
-      ADD: result = s1 + s2;
-      SUB: result = s1 - s2;
+      ADD: result = s1 + s2 + 0;
+      SUB: result = s1 - s2 + 0;
       AND: result = s1 & s2;
       XOR: result = s1 ^ s2;
       SHR: result = shr(s1, s2);
@@ -52,7 +50,7 @@ module ALU (
     if (!s2[15]) begin
       {res, overflow} = {s1, 16'b0} >> shift;
     end else begin
-      {overflow, res} = {16'b0, s1} << (~shift + 1);
+      {overflow, res} = {16'b0, s1} << 4'(-shift);
     end
     shr = {overflow != 0, res};
   endfunction
