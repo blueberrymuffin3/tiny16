@@ -22,7 +22,7 @@ module Registers (
   // Register 0 is the IR
   assign ir = regs[0];
 
-  assign memory_store = regs[memory_index];
+  assign memory_store = memory_index == 0 ? 16'b0 : regs[memory_index];
   assign alu_rs1 = alu_rs1_i == 0 ? 16'b0 : regs[alu_rs1_i];
   assign alu_rs2 = alu_rs2_i == 0 ? 16'b0 : regs[alu_rs2_i];
 
