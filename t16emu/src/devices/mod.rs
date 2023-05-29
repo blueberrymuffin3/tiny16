@@ -1,2 +1,2 @@
 pub mod xterm;
-// pub mod graphics;
+pub mod gpu;

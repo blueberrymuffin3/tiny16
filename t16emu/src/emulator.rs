@@ -127,7 +127,7 @@ pub fn exec_inst(state: &mut ProcessorState) -> bool {
         }
         0xB => {
             // LUI
-            let value = imm8 << 8 | state.registers.read(i1);
+            let value = imm8 << 8 | (state.registers.read(i1) & 0xFF);
             state.registers.write(i1, value);
             state.flags = Flags::from_value(value, false, false);
         }
