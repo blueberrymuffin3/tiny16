@@ -133,12 +133,15 @@ pub fn exec_inst(state: &mut ProcessorState) -> bool {
         }
         0xC => {
             // LDR
+            // TODO: Partly Incorrect flags
+            state.flags = Flags::from_value(addr, false, false);
             let value = state.memory.read(addr);
             state.registers.write(i1, value);
-            state.flags = Flags::from_value(value, false, false);
         }
         0xD => {
             // STR
+            // TODO: Partly Incorrect flags
+            state.flags = Flags::from_value(addr, false, false);
             state.memory.write(addr, state.registers.read(i1));
         }
         0xE => {
