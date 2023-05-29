@@ -40,8 +40,7 @@ module ALU (
       SUB: result = s1 - s2;
       AND: result = s1 & s2;
       XOR: result = s1 ^ s2;
-      // SHR: result = shr(s1, s2);
-      SHR: result = s1 >> s2;
+      SHR: result = shr(s1, s2);
       LDUI: result = {s2[7:0], s1[7:0]};
       default: result = 0;
     endcase
