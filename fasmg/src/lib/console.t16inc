@@ -15,6 +15,7 @@ proc console_print_word_string
     ldi r7, console_addr
   .loop:
     ldr r2, r1, 0
+    cmpi r2, 0
     beq .exit
     str r2, r7, console_offset_io
     addi r1, r1, 2

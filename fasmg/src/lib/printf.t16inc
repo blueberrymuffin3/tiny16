@@ -210,5 +210,5 @@ proc printf
   
   .print_char:
     str r1, r9, console_offset_io
-    b .loop
+    ret
 end proc

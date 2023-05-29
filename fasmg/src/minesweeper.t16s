@@ -381,6 +381,10 @@ proc move_cursor
     ret
 end proc
 
+; TODO: This code assumes that all escape sequences will come in "burst".
+; This is true for the emulator, but not for UART with slow baud rates.
+; This should be replaced with a better implimentation that respects the ANSI
+; standard instead of relying on an implimentation detail.
 proc get_input
   ; Args:
   ; Vars:
@@ -408,8 +412,9 @@ proc get_input
     bne .clear_invalid_seq ; Invalid ESC SEQ
     ldr r1, r7, console_offset_io
     subr r1, r0, r1 ; Return 0-char
-    ldr r0, r7, console_offset_io ; Just check the flags of the char. we read
-    bge .clear_invalid_seq ; We got extra characters, ignore this sequence
+    ldr r2, r7, console_offset_io ; Check if there is another char after this one (there shouldn't be)
+    cmpi r2, -1
+    bne .clear_invalid_seq ; We got extra characters, ignore this sequence
 
     b .exit
   
