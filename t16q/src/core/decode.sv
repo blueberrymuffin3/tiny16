@@ -30,7 +30,7 @@ module Decode (
       3'd4: check_cond = check[0] ^ (flags.c && !flags.z);
       3'd5: check_cond = check[0] ^ (flags.n == flags.v);
       3'd6: check_cond = check[0] ^ (!flags.z && (flags.n == flags.z));
-      3'd7: check_cond = check[0] ^ (1);
+      3'd7: check_cond = check[0] ^ (1'b1);
       default: check_cond = 0;
     endcase
   endfunction

@@ -5,6 +5,8 @@ module Core #(
 ) (
     input clkin,
     input reset,
+    input MMIOIn mmio_in,
+    output MMIOOut mmio_out,
 
     output [15:0] debug_d,
     output [ 3:0] debug_rd,
@@ -24,7 +26,8 @@ module Core #(
   assign debug_leds[9] = clk.ph1;
   assign debug_leds[8] = clk.ph0;
   assign debug_leds[7] = mem_w_en;
-  assign debug_leds[6:5] = 2'b0;
+  assign debug_leds[6] = !mmio_out.uart_tx;
+  assign debug_leds[5] = mmio_out.uart_tx;
   assign debug_leds[4:1] = 4'(alu_flags_l);
   assign debug_leds[0] = reset_l;
 
@@ -84,7 +87,9 @@ module Core #(
       .w_en(mem_w_en),
       .addr(alu_d),
       .data_w(mem_w),
-      .data_r(mem_r)
+      .data_r(mem_r),
+      .mmio_in(mmio_in),
+      .mmio_out(mmio_out)
   );
 
 

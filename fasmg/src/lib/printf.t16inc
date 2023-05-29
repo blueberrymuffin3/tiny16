@@ -193,8 +193,7 @@ proc printf
     andi r0, r8, 1
     bne .get_char_odd
     ldr r2, r8, 0
-    ldi r1, 0xFF
-    andr r2, r2, r1
+    ldui r2, 0
     ret
   .get_char_odd:
     subi r1, r8, 1

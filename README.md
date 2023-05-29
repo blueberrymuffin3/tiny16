@@ -14,7 +14,7 @@ tiny16 is a simple 16-bit RISC cpu.
 # Getting Started
 ```sh
 # Install the VSCode extension (linux)
-$ ln -s $(pwd)/vsc-ext ~/.vscode/extensions/tiny17-vsc-0.0.1
+$ ln -s $(pwd)/vsc-ext ~/.vscode/extensions/tiny16-vsc-0.0.1
 # Setup environment with nix-shell
 $ nix-shell
 # Build and launch hello world program

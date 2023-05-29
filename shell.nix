@@ -25,5 +25,12 @@ pkgs.mkShell {
     # pkgs.quartus-prime-lite
     (pkgs.callPackage ./t16vl/iverilog.nix { })
     (pkgs.callPackage ./t16vl/istyle.nix { })
+
+    # Serial console:
+    pkgs.python3Packages.pyserial
   ];
+
+  shellHook = ''
+    alias miniterm.py='python -m serial.tools.miniterm'
+  '';
 }

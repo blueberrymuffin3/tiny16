@@ -11,22 +11,22 @@
 `default_nettype none
 
 // `define ENABLE_ADC_CLOCK
-`define ENABLE_CLOCK1 
-`define ENABLE_CLOCK2 
+`define ENABLE_CLOCK1
+`define ENABLE_CLOCK2
 // `define ENABLE_SDRAM
-`define ENABLE_HEX0 
-`define ENABLE_HEX1 
-`define ENABLE_HEX2 
-`define ENABLE_HEX3 
-`define ENABLE_HEX4 
-`define ENABLE_HEX5 
+`define ENABLE_HEX0
+`define ENABLE_HEX1
+`define ENABLE_HEX2
+`define ENABLE_HEX3
+`define ENABLE_HEX4
+`define ENABLE_HEX5
 `define ENABLE_KEY
-`define ENABLE_LED 
-`define ENABLE_SW 
+`define ENABLE_LED
+`define ENABLE_SW
 `define ENABLE_VGA
 // `define ENABLE_ACCELEROMETER
 // `define ENABLE_ARDUINO
-`define ENABLE_GPIO 
+`define ENABLE_GPIO
 
 module DE10_LITE_Golden_Top (
 
@@ -122,24 +122,24 @@ module DE10_LITE_Golden_Top (
     inout tri [35:0] GPIO
 `endif
 );
-  bit reset;
-  assign reset = !KEY[0];
 
   bit clockpll_video;
   bit clockpll_core;
-  clockpll clockpll(
-    .areset(0),
-    .inclk0(MAX10_CLK1_50),
-    .c0(clockpll_core),
-    .c1(clockpll_video),
-    .locked()
+  bit clockpll_uart;
+  clockpll clockpll (
+      .areset(0),
+      .inclk0(MAX10_CLK1_50),
+      .c0(clockpll_core),
+      .c1(clockpll_video),
+      .c2(clockpll_uart),
+      .locked()
   );
 
-  GPU gpu(
-    .clk(clockpll_video),
-    .rgb({VGA_R, VGA_G, VGA_B}),
-    .hs(VGA_HS),
-    .vs(VGA_VS)
+  GPU gpu (
+      .clk(clockpll_video),
+      .rgb({VGA_R, VGA_G, VGA_B}),
+      .hs (VGA_HS),
+      .vs (VGA_VS)
   );
 
   bit [15:0] word;
@@ -152,23 +152,39 @@ module DE10_LITE_Golden_Top (
   );
 
   bit [3:0] n0;
-  SevenSegDigit hex0(n0, HEX0);
-  bit [3:0] n1;
-  SevenSegDigit hex1(n1, HEX1);
-
-  Core #(10) core(
-    .clkin(clockpll_core),
-    .reset(reset),
-    .debug_d(word),
-    .debug_rd(n0),
-    .debug_leds(LEDR)
+  SevenSegDigit hex0 (
+      n0,
+      HEX0
   );
-  // Core #(0) core(
-  //   .clkin(KEY[1]),
-  //   .reset(reset),
-  //   .debug_d(word),
-  //   .debug_mi(n1),
-  //   .debug_rd(n0),
-  //   .debug_leds(LEDR)
-  // );
+  bit [3:0] n1;
+  SevenSegDigit hex1 (
+      n1,
+      HEX1
+  );
+
+  int clkdiv = 0;
+  always_ff @(posedge clockpll_core) clkdiv <= clkdiv + 1;
+  bit clockpll_core_div;
+  assign clockpll_core_div = clkdiv[1];
+  bit core_clkin;
+  assign core_clkin = reset || SW[0] ? clockpll_core_div : !KEY[1];
+
+  bit reset;
+  assign reset = !KEY[0];
+
+  MMIOIn mmio_in;
+  MMIOOut mmio_out;
+  assign mmio_in.uart_clk = clockpll_uart;
+  assign GPIO[0] = mmio_out.uart_tx;
+
+  Core #(0) core (
+      .clkin(core_clkin),
+      .reset(reset),
+      .debug_d(word),
+      .debug_mi(n1),
+      .debug_rd(n0),
+      .debug_leds(LEDR),
+      .mmio_in(mmio_in),
+      .mmio_out(mmio_out)
+  );
 endmodule
