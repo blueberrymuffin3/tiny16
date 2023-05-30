@@ -97,7 +97,7 @@ proc math_mult_word
     shrr r3, r3, r5
   .loop_start:
     shrr r1, r1, r5
-    bvc .emit_zero    ; if overflow
+    bcc .emit_zero    ; if overflow
     addr r3, r3, r2   ; - result++
   .emit_zero:
     subi r4, r4, 1
