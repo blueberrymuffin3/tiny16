@@ -1,0 +1,21 @@
+include "lib/tiny16.t16inc"
+include "lib/console.t16inc"
+include "lib/math.t16inc"
+
+proc main
+  subi sp, sp, 2
+  str lr, sp, 0     ; Save lr on the stack
+
+  call console_init
+
+  ldi r1, 0
+  call console_print_word_signed
+  ldi r1, 1
+  call console_print_word_signed
+  ldi r1, -1
+  call console_print_word_signed
+
+  ldr lr, sp, 0     ; Restore lr from the stack
+  addi sp, sp, 2
+  ret
+end proc
